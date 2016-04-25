@@ -7,3 +7,14 @@
 -- these lines here.
 
 
+CREATE TABLE REGISTERED_PLAYERS(
+   PLAYER_ID SERIAL PRIMARY KEY,
+   NAME           TEXT    NOT NULL,
+   WINS            INT     NOT NULL,
+   MATCHES			INT 	NOT NULL
+);
+
+CREATE TABLE ROUNDS(
+   WINNER_ID        INT    NOT NULL,
+   LOSER_ID			INT    NOT NULL
+);

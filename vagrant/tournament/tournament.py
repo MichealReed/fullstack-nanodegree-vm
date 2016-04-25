@@ -4,6 +4,8 @@
 #
 
 import psycopg2
+import bleach
+import math
 
 
 def connect():
@@ -12,15 +14,53 @@ def connect():
 
 
 def deleteMatches():
-    """Remove all the match records from the database."""
+    """Remove all the player records from the database."""
+    DB = connect()
+    c = DB.cursor()
+    c.execute("TRUNCATE ROUNDS")
+    DB.commit()
 
+        # Update matches and wins
+    query = '''
+                UPDATE REGISTERED_PLAYERS
+                    SET MATCHES = 0
+            '''
+    c.execute(query)
+    DB.commit()
+
+    query = '''
+                UPDATE REGISTERED_PLAYERS
+                    SET WINS = 0
+            '''
+    c.execute(query)
+    DB.commit()
+
+    DB.close()
 
 def deletePlayers():
     """Remove all the player records from the database."""
+    DB = connect()
+    c = DB.cursor()
+    c.execute("TRUNCATE REGISTERED_PLAYERS")
+    DB.commit()
+    DB.close()
 
 
 def countPlayers():
     """Returns the number of players currently registered."""
+    DB = connect()
+    c = DB.cursor()
+
+    c.execute("SELECT count(*) from REGISTERED_PLAYERS")
+    count = c.fetchall()
+    DB.close()
+    count = count[0]
+    count = count[0]
+
+    if count == None:
+        count = 0
+
+    return count
 
 
 def registerPlayer(name):
@@ -32,6 +72,12 @@ def registerPlayer(name):
     Args:
       name: the player's full name (need not be unique).
     """
+    DB = connect()
+    bleach.clean(name)
+    c = DB.cursor()
+    c.execute("INSERT INTO REGISTERED_PLAYERS (NAME, WINS, MATCHES) VALUES (%s, %s, %s)", (name, 0, 0))
+    DB.commit()
+    DB.close()
 
 
 def playerStandings():
@@ -47,6 +93,23 @@ def playerStandings():
         wins: the number of matches the player has won
         matches: the number of matches the player has played
     """
+    DB = connect()
+    c = DB.cursor()
+
+    query = '''
+                SELECT REGISTERED_PLAYERS.PLAYER_ID,
+                       REGISTERED_PLAYERS.NAME,
+                       REGISTERED_PLAYERS.WINS,
+                       REGISTERED_PLAYERS.MATCHES
+                FROM REGISTERED_PLAYERS
+                ORDER BY REGISTERED_PLAYERS.WINS DESC
+            '''
+
+    c.execute(query)
+    standing = c.fetchall()
+    DB.close()
+
+    return standing
 
 
 def reportMatch(winner, loser):
@@ -56,6 +119,65 @@ def reportMatch(winner, loser):
       winner:  the id number of the player who won
       loser:  the id number of the player who lost
     """
+    DB = connect()
+    c = DB.cursor()
+
+    # Update ROUNDS with winner and loser of match
+    query = '''
+                INSERT INTO ROUNDS (WINNER_ID, LOSER_ID)
+                VALUES (%s, %s)
+            '''
+
+    c.execute(query, (winner, loser))
+    DB.commit()
+
+    # Update matches in REGISTERED_PLAYERS
+    query = '''
+                UPDATE REGISTERED_PLAYERS
+                    SET MATCHES = (MATCHES + 1)
+                WHERE PLAYER_ID = %s OR PLAYER_ID = %s
+            '''
+    c.execute(query, (winner, loser))
+    DB.commit()
+
+    # Update wins in REGISTERED_PLAYERS
+    query = '''
+                UPDATE REGISTERED_PLAYERS
+                    SET WINS = (WINS + 1)
+                WHERE PLAYER_ID = %s
+            '''
+    c.execute(query, (winner,))
+    DB.commit()
+    DB.close()
+
+def alreadyMatched(id1, id2):
+    """Checks if two players have already been matched
+
+    Args:
+      id1:  the id number of a player
+      id2:  the id number of a player
+    """
+
+    DB = connect()
+    c = DB.cursor()
+
+    query = '''
+                SELECT WINNER_ID,
+                       LOSER_ID
+                FROM ROUNDS
+                WHERE WINNER_ID = %s AND LOSER_ID = %s
+            '''
+    c.execute(query, (id1, id2))
+
+    result = c.fetchall()
+
+    if result:
+        return True
+    else:
+        return False
+
+
+
  
  
 def swissPairings():
@@ -73,5 +195,64 @@ def swissPairings():
         id2: the second player's unique id
         name2: the second player's name
     """
+    # We need to find out more about our current state and numbers
+    player_count = countPlayers()
+    total_rounds = math.log(player_count)/math.log(2)
+    total_matches = total_rounds * player_count
+    DB = connect()
+    c = DB.cursor()
+
+    # Created the lists we will use to match the players
+    player_list = playerStandings()
+    match_list = [ ]
+    unmatched_list = [ ]
+
+    # separate our results for easier handling
+    player_id = [seq[0] for seq in player_list]
+    name = [seq[1] for seq in player_list]
+    wins = [seq[2] for seq in player_list]
+    matches = [seq[3] for seq in player_list]
+
+
+    
+    # Creates pairings for zero matches
+    if matches[0]  == 0:
+
+        counter = 0
+
+        while (counter <= (player_count / 2) + 2):
+            match_list.append((player_id[counter], name[counter], player_id[counter + 1], name[counter + 1]))
+            counter = counter + 2
+
+    if matches[0] > 0 and matches[0] <= total_rounds:
+
+        counter = 0
+        # Initial loop to find matched players and place already matched in a unmatched list
+        while (counter < player_count):
+            if alreadyMatched(player_id[counter], player_id[counter + 1]) == False:
+                match_list.append((player_id[counter], name[counter], player_id[counter + 1], name[counter + 1]))
+            if alreadyMatched(player_id[counter], player_id[counter + 1]) == True:
+                unmatched_list.append((player_id[counter], name[counter], player_id[counter + 1], name[counter + 1]))
+            counter = counter + 2
+
+        counter = 0
+        # Secondary loop over our unmatched list to match remaining players
+        if len(unmatched_list) > 0:
+            while len(unmatched_list) > 0:
+                match_list.append((player_id[counter], name[counter], player_id[counter + 1], name[counter + 1]))
+                unmatched_list.pop(counter)
+                unmatched_list.pop(counter + 1)
+
+
+    return match_list
+
+
+
+
+
+
+
+
+
 
 
