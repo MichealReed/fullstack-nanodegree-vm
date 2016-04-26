@@ -13,13 +13,8 @@ This program allows you to register any even number of players, and using a swis
 
 ## Adding Our Database:
 
-* In the vagrant command line, type psql.
-* Now to create our new database, type CREATE DATABASE tournament.
-* Type \q to exit the psql command line.
-* Now we need to utilize the included tournament.sql file to create our tables.
-* Change directory - "cd /vagrant/tournament"
-* Run the sql file - "psql -f tournament.sql tournament"
-* You should see two CREATE TABLE responses.
+* Navigate to the tournament folder by typing "cd /vagrant/tournament
+* In the vagrant command line, type "psql -f tournament.sql" to create out database.
 
 ## Running Our Program:
 

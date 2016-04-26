@@ -17,20 +17,13 @@ def deleteMatches():
     """Remove all the player records from the database."""
     DB = connect()
     c = DB.cursor()
-    c.execute("TRUNCATE ROUNDS")
+    c.execute("TRUNCATE ROUNDS CASCADE")
     DB.commit()
 
         # Update matches and wins
     query = '''
                 UPDATE REGISTERED_PLAYERS
-                    SET MATCHES = 0
-            '''
-    c.execute(query)
-    DB.commit()
-
-    query = '''
-                UPDATE REGISTERED_PLAYERS
-                    SET WINS = 0
+                SET MATCHES = 0
             '''
     c.execute(query)
     DB.commit()
@@ -41,7 +34,7 @@ def deletePlayers():
     """Remove all the player records from the database."""
     DB = connect()
     c = DB.cursor()
-    c.execute("TRUNCATE REGISTERED_PLAYERS")
+    c.execute("TRUNCATE REGISTERED_PLAYERS CASCADE")
     DB.commit()
     DB.close()
 
@@ -73,9 +66,8 @@ def registerPlayer(name):
       name: the player's full name (need not be unique).
     """
     DB = connect()
-    bleach.clean(name)
     c = DB.cursor()
-    c.execute("INSERT INTO REGISTERED_PLAYERS (NAME, WINS, MATCHES) VALUES (%s, %s, %s)", (name, 0, 0))
+    c.execute("INSERT INTO REGISTERED_PLAYERS (NAME, MATCHES) VALUES (%s, %s)", (name, 0))
     DB.commit()
     DB.close()
 
@@ -97,12 +89,7 @@ def playerStandings():
     c = DB.cursor()
 
     query = '''
-                SELECT REGISTERED_PLAYERS.PLAYER_ID,
-                       REGISTERED_PLAYERS.NAME,
-                       REGISTERED_PLAYERS.WINS,
-                       REGISTERED_PLAYERS.MATCHES
-                FROM REGISTERED_PLAYERS
-                ORDER BY REGISTERED_PLAYERS.WINS DESC
+                SELECT * FROM WINTRACKER;
             '''
 
     c.execute(query)
@@ -140,14 +127,6 @@ def reportMatch(winner, loser):
     c.execute(query, (winner, loser))
     DB.commit()
 
-    # Update wins in REGISTERED_PLAYERS
-    query = '''
-                UPDATE REGISTERED_PLAYERS
-                    SET WINS = (WINS + 1)
-                WHERE PLAYER_ID = %s
-            '''
-    c.execute(query, (winner,))
-    DB.commit()
     DB.close()
 
 def alreadyMatched(id1, id2):
@@ -199,8 +178,6 @@ def swissPairings():
     player_count = countPlayers()
     total_rounds = math.log(player_count)/math.log(2)
     total_matches = total_rounds * player_count
-    DB = connect()
-    c = DB.cursor()
 
     # Created the lists we will use to match the players
     player_list = playerStandings()
@@ -210,7 +187,6 @@ def swissPairings():
     # separate our results for easier handling
     player_id = [seq[0] for seq in player_list]
     name = [seq[1] for seq in player_list]
-    wins = [seq[2] for seq in player_list]
     matches = [seq[3] for seq in player_list]
 
 
